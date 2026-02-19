@@ -377,7 +377,8 @@ export const mergeRequestTools: Tool[] = [
   },
   {
     name: 'create_mr_note',
-    description: 'Add a new top-level comment to a merge request',
+    description:
+      'Add a new top-level comment to a merge request. Supports embedding images/files via attachments parameter.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -391,7 +392,16 @@ export const mergeRequestTools: Tool[] = [
         },
         body: {
           type: 'string',
-          description: 'The content of the comment (supports Markdown)',
+          description:
+            'The content of the comment (supports Markdown). Use {{placeholderName}} syntax to embed attachments.',
+        },
+        attachments: {
+          type: 'object',
+          description:
+            'Map of placeholder names to local file paths. Each file is uploaded and {{placeholderName}} in body is replaced with the GitLab markdown. Example: {"screenshot": "/tmp/screenshot.png"} replaces {{screenshot}} with ![screenshot](/uploads/...)',
+          additionalProperties: {
+            type: 'string',
+          },
         },
       },
       required: ['project_id', 'merge_request_iid', 'body'],
@@ -400,7 +410,7 @@ export const mergeRequestTools: Tool[] = [
   {
     name: 'create_mr_discussion',
     description:
-      'Create a new discussion on a merge request. Can be a general discussion or an inline comment on the diff',
+      'Create a new discussion on a merge request. Can be a general discussion or an inline comment on the diff. Supports embedding images/files via attachments parameter.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -414,7 +424,16 @@ export const mergeRequestTools: Tool[] = [
         },
         body: {
           type: 'string',
-          description: 'The content of the discussion (supports Markdown)',
+          description:
+            'The content of the discussion (supports Markdown). Use {{placeholderName}} syntax to embed attachments.',
+        },
+        attachments: {
+          type: 'object',
+          description:
+            'Map of placeholder names to local file paths. Each file is uploaded and {{placeholderName}} in body is replaced with the GitLab markdown. Example: {"screenshot": "/tmp/screenshot.png"} replaces {{screenshot}} with ![screenshot](/uploads/...)',
+          additionalProperties: {
+            type: 'string',
+          },
         },
         position: {
           type: 'object',
@@ -687,6 +706,154 @@ export const mergeRequestTools: Tool[] = [
         },
       },
       required: ['project_id', 'name'],
+    },
+  },
+  {
+    name: 'delete_mr_note',
+    description: 'Delete a top-level note (comment) from a merge request',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        project_id: {
+          type: 'string',
+          description: 'Project ID or path',
+        },
+        merge_request_iid: {
+          type: 'number',
+          description: 'Merge request internal ID',
+        },
+        note_id: {
+          type: 'number',
+          description: 'The ID of the note to delete',
+        },
+      },
+      required: ['project_id', 'merge_request_iid', 'note_id'],
+    },
+  },
+  {
+    name: 'update_mr_note',
+    description:
+      'Update the content of an existing top-level note (comment) on a merge request. Supports embedding images/files via attachments parameter.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        project_id: {
+          type: 'string',
+          description: 'Project ID or path',
+        },
+        merge_request_iid: {
+          type: 'number',
+          description: 'Merge request internal ID',
+        },
+        note_id: {
+          type: 'number',
+          description: 'The ID of the note to update',
+        },
+        body: {
+          type: 'string',
+          description:
+            'New content for the note (supports Markdown). Use {{placeholderName}} syntax to embed attachments.',
+        },
+        attachments: {
+          type: 'object',
+          description:
+            'Map of placeholder names to local file paths. Each file is uploaded and {{placeholderName}} in body is replaced with the GitLab markdown. Example: {"screenshot": "/tmp/screenshot.png"} replaces {{screenshot}} with ![screenshot](/uploads/...)',
+          additionalProperties: {
+            type: 'string',
+          },
+        },
+      },
+      required: ['project_id', 'merge_request_iid', 'note_id', 'body'],
+    },
+  },
+  {
+    name: 'update_mr_labels',
+    description: 'Add or remove labels from a merge request. More convenient than update_merge_request for label-only changes.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        project_id: {
+          type: 'string',
+          description: 'Project ID or path',
+        },
+        merge_request_iid: {
+          type: 'number',
+          description: 'Merge request internal ID',
+        },
+        add_labels: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Labels to add to the merge request',
+        },
+        remove_labels: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Labels to remove from the merge request',
+        },
+      },
+      required: ['project_id', 'merge_request_iid'],
+    },
+  },
+  {
+    name: 'get_mr_approvals',
+    description: 'Get the approval status of a merge request, including who has approved, how many approvals are needed, and approval rules.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        project_id: {
+          type: 'string',
+          description: 'Project ID or path',
+        },
+        merge_request_iid: {
+          type: 'number',
+          description: 'Merge request internal ID',
+        },
+      },
+      required: ['project_id', 'merge_request_iid'],
+    },
+  },
+  {
+    name: 'approve_mr',
+    description: 'Approve a merge request. The authenticated user must have permission to approve.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        project_id: {
+          type: 'string',
+          description: 'Project ID or path',
+        },
+        merge_request_iid: {
+          type: 'number',
+          description: 'Merge request internal ID',
+        },
+        sha: {
+          type: 'string',
+          description: 'SHA of the HEAD commit. Approval fails if this does not match the current HEAD.',
+        },
+        approval_password: {
+          type: 'string',
+          description: 'Current password of the authenticated user. Required if "Require user re-authentication" is enabled.',
+        },
+      },
+      required: ['project_id', 'merge_request_iid'],
+    },
+  },
+  {
+    name: 'unapprove_mr',
+    description: 'Remove your approval from a merge request.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        project_id: {
+          type: 'string',
+          description: 'Project ID or path',
+        },
+        merge_request_iid: {
+          type: 'number',
+          description: 'Merge request internal ID',
+        },
+      },
+      required: ['project_id', 'merge_request_iid'],
     },
   },
 ];

@@ -167,8 +167,9 @@ describe('GitLabMCPServer', () => {
 
     it('should setup tool handlers', () => {
       new GitLabMCPServer();
-      
-      expect(mockServer.setRequestHandler).toHaveBeenCalledTimes(2);
+
+      // 2 for tools + 3 for resources + 2 for prompts + 1 for logging = 8
+      expect(mockServer.setRequestHandler).toHaveBeenCalledTimes(8);
     });
   });
 });

@@ -20,11 +20,54 @@ import type {
   MarkMRAsReadyParams,
   ListMRTemplatesParams,
   GetMRTemplateParams,
+  DeleteMRNoteParams,
+  UpdateMRNoteParams,
+  UpdateMRLabelsParams,
+  GetMRApprovalsParams,
+  ApproveMRParams,
+  UnapproveMRParams,
   GitLabMergeRequest,
 } from "../types.js";
 
 export class MergeRequestHandlers {
   constructor(private client: GitLabClient) {}
+
+  /**
+   * Helper method to process attachments in body text.
+   * Uploads each file and replaces {{placeholderName}} with the GitLab markdown.
+   * @param projectId - The project ID or path
+   * @param body - The body text containing {{placeholder}} references
+   * @param attachments - Map of placeholder names to file paths
+   * @returns The body with placeholders replaced by uploaded file markdown
+   */
+  private async processAttachments(
+    projectId: string,
+    body: string,
+    attachments?: Record<string, string>
+  ): Promise<string> {
+    if (!attachments || Object.keys(attachments).length === 0) {
+      return body;
+    }
+
+    let processedBody = body;
+
+    for (const [placeholderName, filePath] of Object.entries(attachments)) {
+      // Upload the file
+      const uploadResult = await this.client.uploadFile(
+        `/projects/${encodeURIComponent(projectId)}/uploads`,
+        filePath
+      );
+
+      // Replace {{placeholderName}} with the markdown from GitLab
+      const placeholder = `{{${placeholderName}}}`;
+      processedBody = processedBody.replace(
+        new RegExp(placeholder.replace(/[{}]/g, '\\$&'), 'g'),
+        uploadResult.markdown
+      );
+    }
+
+    return processedBody;
+  }
 
   /**
    * Helper method to resolve merge request IID from source branch name
@@ -401,8 +444,15 @@ export class MergeRequestHandlers {
   }
 
   async createMRNote(args: CreateMRNoteParams) {
+    // Process attachments if provided
+    const processedBody = await this.processAttachments(
+      args.project_id,
+      args.body,
+      args.attachments
+    );
+
     const requestData = {
-      body: args.body,
+      body: processedBody,
     };
 
     const data = await this.client.post(
@@ -423,8 +473,15 @@ export class MergeRequestHandlers {
   }
 
   async createMRDiscussion(args: CreateMRDiscussionParams) {
+    // Process attachments if provided
+    const processedBody = await this.processAttachments(
+      args.project_id,
+      args.body,
+      args.attachments
+    );
+
     const requestData: Record<string, unknown> = {
-      body: args.body,
+      body: processedBody,
     };
 
     // Add position for inline/diff comments
@@ -688,6 +745,140 @@ export class MergeRequestHandlers {
       `/projects/${encodeURIComponent(
         args.project_id
       )}/templates/merge_requests/${encodeURIComponent(args.name)}`
+    );
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify(data, null, 2),
+        },
+      ],
+    };
+  }
+
+  async deleteMRNote(args: DeleteMRNoteParams) {
+    await this.client.delete(
+      `/projects/${encodeURIComponent(args.project_id)}/merge_requests/${
+        args.merge_request_iid
+      }/notes/${args.note_id}`
+    );
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify(
+            { message: "Note deleted successfully" },
+            null,
+            2
+          ),
+        },
+      ],
+    };
+  }
+
+  async updateMRNote(args: UpdateMRNoteParams) {
+    // Process attachments if provided
+    const processedBody = await this.processAttachments(
+      args.project_id,
+      args.body,
+      args.attachments
+    );
+
+    const data = await this.client.put(
+      `/projects/${encodeURIComponent(args.project_id)}/merge_requests/${
+        args.merge_request_iid
+      }/notes/${args.note_id}`,
+      { body: processedBody }
+    );
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify(data, null, 2),
+        },
+      ],
+    };
+  }
+
+  async updateMRLabels(args: UpdateMRLabelsParams) {
+    const requestData: any = {};
+
+    if (args.add_labels && args.add_labels.length > 0) {
+      requestData.add_labels = args.add_labels.join(",");
+    }
+    if (args.remove_labels && args.remove_labels.length > 0) {
+      requestData.remove_labels = args.remove_labels.join(",");
+    }
+
+    const data = await this.client.put(
+      `/projects/${encodeURIComponent(args.project_id)}/merge_requests/${
+        args.merge_request_iid
+      }`,
+      requestData
+    );
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify(data, null, 2),
+        },
+      ],
+    };
+  }
+
+  async getMRApprovals(args: GetMRApprovalsParams) {
+    const data = await this.client.get(
+      `/projects/${encodeURIComponent(args.project_id)}/merge_requests/${
+        args.merge_request_iid
+      }/approvals`
+    );
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify(data, null, 2),
+        },
+      ],
+    };
+  }
+
+  async approveMR(args: ApproveMRParams) {
+    const requestData: any = {};
+
+    if (args.sha) {
+      requestData.sha = args.sha;
+    }
+    if (args.approval_password) {
+      requestData.approval_password = args.approval_password;
+    }
+
+    const data = await this.client.post(
+      `/projects/${encodeURIComponent(args.project_id)}/merge_requests/${
+        args.merge_request_iid
+      }/approve`,
+      Object.keys(requestData).length > 0 ? requestData : undefined
+    );
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify(data, null, 2),
+        },
+      ],
+    };
+  }
+
+  async unapproveMR(args: UnapproveMRParams) {
+    const data = await this.client.post(
+      `/projects/${encodeURIComponent(args.project_id)}/merge_requests/${
+        args.merge_request_iid
+      }/unapprove`
     );
 
     return {

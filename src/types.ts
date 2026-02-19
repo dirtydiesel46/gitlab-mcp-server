@@ -486,12 +486,14 @@ export interface CreateMRNoteParams {
   project_id: string;
   merge_request_iid: number;
   body: string;
+  attachments?: Record<string, string>; // { placeholderName: filePath }
 }
 
 export interface CreateMRDiscussionParams {
   project_id: string;
   merge_request_iid: number;
   body: string;
+  attachments?: Record<string, string>; // { placeholderName: filePath }
   position?: {
     base_sha: string;
     start_sha: string;
@@ -538,6 +540,94 @@ export interface DeleteMRDiscussionNoteParams {
   merge_request_iid: number;
   discussion_id: string;
   note_id: number;
+}
+
+// MR Note Management Types (top-level notes, not discussion notes)
+export interface DeleteMRNoteParams {
+  project_id: string;
+  merge_request_iid: number;
+  note_id: number;
+}
+
+export interface UpdateMRNoteParams {
+  project_id: string;
+  merge_request_iid: number;
+  note_id: number;
+  body: string;
+  attachments?: Record<string, string>; // { placeholderName: filePath }
+}
+
+// MR Labels Management
+export interface UpdateMRLabelsParams {
+  project_id: string;
+  merge_request_iid: number;
+  add_labels?: string[];
+  remove_labels?: string[];
+}
+
+// MR Approvals Types
+export interface GetMRApprovalsParams {
+  project_id: string;
+  merge_request_iid: number;
+}
+
+export interface ApproveMRParams {
+  project_id: string;
+  merge_request_iid: number;
+  sha?: string; // Optional SHA for approval
+  approval_password?: string; // Optional for protected MRs
+}
+
+export interface UnapproveMRParams {
+  project_id: string;
+  merge_request_iid: number;
+}
+
+// Project Upload Types
+export interface UploadProjectFileParams {
+  project_id: string;
+  file: string; // Local file path
+}
+
+export interface ListProjectUploadsParams {
+  project_id: string;
+}
+
+export interface ListProjectLabelsParams {
+  project_id: string;
+  search?: string;
+  include_ancestor_groups?: boolean;
+  with_counts?: boolean;
+}
+
+export interface GitLabLabel {
+  id: number;
+  name: string;
+  color: string;
+  text_color: string;
+  description: string | null;
+  description_html: string | null;
+  open_issues_count?: number;
+  closed_issues_count?: number;
+  open_merge_requests_count?: number;
+  subscribed: boolean;
+  priority: number | null;
+  is_project_label: boolean;
+}
+
+export interface GitLabUploadResponse {
+  alt: string;
+  url: string;
+  full_path: string;
+  markdown: string;
+}
+
+export interface GitLabProjectUpload {
+  id: number;
+  size: number;
+  filename: string;
+  created_at: string;
+  uploaded_by: GitLabUser;
 }
 
 export interface MarkMRAsDraftParams {

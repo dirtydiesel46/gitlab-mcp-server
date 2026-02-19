@@ -1,4 +1,7 @@
 import axios, { AxiosInstance } from 'axios';
+import FormData from 'form-data';
+import * as fs from 'fs';
+import * as path from 'path';
 import type { GitLabConfig } from './types.js';
 
 /**
@@ -65,5 +68,23 @@ export class GitLabClient {
   async delete(endpoint: string): Promise<any> {
     const response = await this.axios.delete(endpoint);
     return response;
+  }
+
+  /**
+   * Upload a file to the GitLab API using multipart form data
+   */
+  async uploadFile(endpoint: string, filePath: string): Promise<any> {
+    const formData = new FormData();
+    const fileStream = fs.createReadStream(filePath);
+    const fileName = path.basename(filePath);
+
+    formData.append('file', fileStream, fileName);
+
+    const response = await this.axios.post(endpoint, formData, {
+      headers: {
+        ...formData.getHeaders(),
+      },
+    });
+    return response.data;
   }
 }

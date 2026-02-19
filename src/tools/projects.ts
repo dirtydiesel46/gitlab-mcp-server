@@ -49,4 +49,64 @@ export const projectTools: Tool[] = [
       required: ['project_id'],
     },
   },
+  {
+    name: 'upload_project_file',
+    description: 'Upload a file to a GitLab project. Returns a markdown string and URL that can be embedded in MR comments, issue descriptions, etc.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        project_id: {
+          type: 'string',
+          description: 'Project ID or path',
+        },
+        file: {
+          type: 'string',
+          description: 'Local file path to upload (e.g., "/tmp/screenshot.png")',
+        },
+      },
+      required: ['project_id', 'file'],
+    },
+  },
+  {
+    name: 'list_project_uploads',
+    description: 'List files that have been uploaded to a project',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        project_id: {
+          type: 'string',
+          description: 'Project ID or path',
+        },
+      },
+      required: ['project_id'],
+    },
+  },
+  {
+    name: 'list_project_labels',
+    description: 'List all labels available in a project. Useful for discovering valid label names before adding them to issues or merge requests.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        project_id: {
+          type: 'string',
+          description: 'Project ID or path',
+        },
+        search: {
+          type: 'string',
+          description: 'Search labels by name',
+        },
+        include_ancestor_groups: {
+          type: 'boolean',
+          description: 'Include labels from ancestor groups (default: true)',
+          default: true,
+        },
+        with_counts: {
+          type: 'boolean',
+          description: 'Include issue and merge request counts (default: false)',
+          default: false,
+        },
+      },
+      required: ['project_id'],
+    },
+  },
 ];

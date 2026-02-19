@@ -67,8 +67,9 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.0",
-    "axios": "^1.7.7"
+    "@modelcontextprotocol/sdk": "^1.26.0",
+    "axios": "^1.7.7",
+    "form-data": "^4.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

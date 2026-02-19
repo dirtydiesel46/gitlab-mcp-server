@@ -1,8 +1,11 @@
 import type { GitLabClient } from '../client.js';
 import type { ConfigManager } from '../config.js';
-import type { 
-  ListProjectsParams, 
-  GetProjectParams
+import type {
+  ListProjectsParams,
+  GetProjectParams,
+  UploadProjectFileParams,
+  ListProjectUploadsParams,
+  ListProjectLabelsParams,
 } from '../types.js';
 
 export class ProjectHandlers {
@@ -47,7 +50,64 @@ export class ProjectHandlers {
 
   async getProject(args: GetProjectParams) {
     const data = await this.client.get(`/projects/${encodeURIComponent(args.project_id)}`);
-    
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(data, null, 2),
+        },
+      ],
+    };
+  }
+
+  async uploadProjectFile(args: UploadProjectFileParams) {
+    const data = await this.client.uploadFile(
+      `/projects/${encodeURIComponent(args.project_id)}/uploads`,
+      args.file
+    );
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(data, null, 2),
+        },
+      ],
+    };
+  }
+
+  async listProjectUploads(args: ListProjectUploadsParams) {
+    const data = await this.client.get(
+      `/projects/${encodeURIComponent(args.project_id)}/uploads`
+    );
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(data, null, 2),
+        },
+      ],
+    };
+  }
+
+  async listProjectLabels(args: ListProjectLabelsParams) {
+    const params = new URLSearchParams();
+
+    if (args.search) params.append('search', args.search);
+    if (args.include_ancestor_groups !== undefined) {
+      params.append('include_ancestor_groups', String(args.include_ancestor_groups));
+    }
+    if (args.with_counts) params.append('with_counts', 'true');
+
+    const queryString = params.toString();
+    const url = `/projects/${encodeURIComponent(args.project_id)}/labels${
+      queryString ? `?${queryString}` : ''
+    }`;
+
+    const data = await this.client.get(url);
+
     return {
       content: [
         {

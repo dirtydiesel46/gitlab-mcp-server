@@ -3,10 +3,20 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
+  ListResourcesRequestSchema,
+  ListResourceTemplatesRequestSchema,
+  ReadResourceRequestSchema,
+  ListPromptsRequestSchema,
+  GetPromptRequestSchema,
+  SetLevelRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 
 // Import all tools
 import { allTools } from "./tools/index.js";
+
+// Import resources and prompts
+import { GitLabResources } from "./resources/index.js";
+import { GitLabPrompts } from "./prompts/index.js";
 
 // Import client and handlers
 import { GitLabClient } from "./client.js";
@@ -29,6 +39,9 @@ import type {
   IGitLabMCPServer,
   ListProjectsParams,
   GetProjectParams,
+  UploadProjectFileParams,
+  ListProjectUploadsParams,
+  ListProjectLabelsParams,
   ListIssuesParams,
   GetIssueParams,
   CreateIssueParams,
@@ -52,6 +65,12 @@ import type {
   MarkMRAsReadyParams,
   ListMRTemplatesParams,
   GetMRTemplateParams,
+  DeleteMRNoteParams,
+  UpdateMRNoteParams,
+  UpdateMRLabelsParams,
+  GetMRApprovalsParams,
+  ApproveMRParams,
+  UnapproveMRParams,
   ListProjectBranchesParams,
   GetProjectCommitsParams,
   GetCommitParams,
@@ -80,6 +99,13 @@ export class GitLabMCPServer implements IGitLabMCPServer {
   private pipelineHandlers: PipelineHandlers;
   private jobHandlers: JobHandlers;
   private userHandlers: UserHandlers;
+
+  // Resources and Prompts handlers
+  private resources: GitLabResources;
+  private prompts: GitLabPrompts;
+
+  // Logging configuration
+  private logLevel: string = "info";
 
   constructor(configPath?: string) {
     // Load configuration (optional)
@@ -128,11 +154,21 @@ export class GitLabMCPServer implements IGitLabMCPServer {
       {
         capabilities: {
           tools: {},
+          resources: {},
+          prompts: {},
+          logging: {},
         },
       }
     );
 
+    // Initialize resources and prompts handlers
+    this.resources = new GitLabResources(this.client);
+    this.prompts = new GitLabPrompts(this.client);
+
     this.setupToolHandlers();
+    this.setupResourceHandlers();
+    this.setupPromptHandlers();
+    this.setupLoggingHandlers();
   }
 
   private setupToolHandlers() {
@@ -157,6 +193,18 @@ export class GitLabMCPServer implements IGitLabMCPServer {
           case "get_project":
             return await this.projectHandlers.getProject(
               args as unknown as GetProjectParams
+            );
+          case "upload_project_file":
+            return await this.projectHandlers.uploadProjectFile(
+              args as unknown as UploadProjectFileParams
+            );
+          case "list_project_uploads":
+            return await this.projectHandlers.listProjectUploads(
+              args as unknown as ListProjectUploadsParams
+            );
+          case "list_project_labels":
+            return await this.projectHandlers.listProjectLabels(
+              args as unknown as ListProjectLabelsParams
             );
 
           // Issue tools
@@ -260,6 +308,30 @@ export class GitLabMCPServer implements IGitLabMCPServer {
             return await this.mergeRequestHandlers.getMRTemplate(
               args as unknown as GetMRTemplateParams
             );
+          case "delete_mr_note":
+            return await this.mergeRequestHandlers.deleteMRNote(
+              args as unknown as DeleteMRNoteParams
+            );
+          case "update_mr_note":
+            return await this.mergeRequestHandlers.updateMRNote(
+              args as unknown as UpdateMRNoteParams
+            );
+          case "update_mr_labels":
+            return await this.mergeRequestHandlers.updateMRLabels(
+              args as unknown as UpdateMRLabelsParams
+            );
+          case "get_mr_approvals":
+            return await this.mergeRequestHandlers.getMRApprovals(
+              args as unknown as GetMRApprovalsParams
+            );
+          case "approve_mr":
+            return await this.mergeRequestHandlers.approveMR(
+              args as unknown as ApproveMRParams
+            );
+          case "unapprove_mr":
+            return await this.mergeRequestHandlers.unapproveMR(
+              args as unknown as UnapproveMRParams
+            );
 
           // User tools
           case "get_user":
@@ -344,6 +416,120 @@ export class GitLabMCPServer implements IGitLabMCPServer {
         };
       }
     });
+  }
+
+  private setupResourceHandlers() {
+    // List static resources
+    this.server.setRequestHandler(ListResourcesRequestSchema, async () => {
+      this.log("debug", "Listing static resources");
+      return {
+        resources: this.resources.getStaticResources(),
+      };
+    });
+
+    // List resource templates
+    this.server.setRequestHandler(
+      ListResourceTemplatesRequestSchema,
+      async () => {
+        this.log("debug", "Listing resource templates");
+        return {
+          resourceTemplates: this.resources.getTemplates(),
+        };
+      }
+    );
+
+    // Read a resource
+    this.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+      const { uri } = request.params;
+      this.log("info", "Reading resource", { uri });
+
+      try {
+        const result = await this.resources.read(uri);
+        this.log("debug", "Resource read successfully", { uri, mimeType: result.mimeType });
+        return {
+          contents: [
+            {
+              uri: result.uri,
+              mimeType: result.mimeType,
+              text: result.text,
+            },
+          ],
+        };
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : "Unknown error";
+        this.log("error", "Failed to read resource", { uri, error: errorMessage });
+        throw new Error(`Failed to read resource: ${errorMessage}`);
+      }
+    });
+  }
+
+  private setupPromptHandlers() {
+    // List available prompts
+    this.server.setRequestHandler(ListPromptsRequestSchema, async () => {
+      this.log("debug", "Listing available prompts");
+      return {
+        prompts: this.prompts.list(),
+      };
+    });
+
+    // Get a specific prompt
+    this.server.setRequestHandler(GetPromptRequestSchema, async (request) => {
+      const { name, arguments: args } = request.params;
+      this.log("info", "Getting prompt", { name, args });
+
+      try {
+        const result = await this.prompts.get(name, args || {});
+        this.log("debug", "Prompt retrieved successfully", { name, description: result.description });
+        return {
+          description: result.description,
+          messages: result.messages,
+        };
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : "Unknown error";
+        this.log("error", "Failed to get prompt", { name, error: errorMessage });
+        throw new Error(`Failed to get prompt: ${errorMessage}`);
+      }
+    });
+  }
+
+  private setupLoggingHandlers() {
+    // Handle log level changes
+    this.server.setRequestHandler(SetLevelRequestSchema, async (request) => {
+      const { level } = request.params;
+      this.logLevel = level;
+
+      // Log the level change
+      console.error(`[GitLab MCP] Log level set to: ${level}`);
+
+      return {};
+    });
+  }
+
+  /**
+   * Send a log message to the client
+   */
+  private log(
+    level: "debug" | "info" | "notice" | "warning" | "error" | "critical" | "alert" | "emergency",
+    message: string,
+    data?: Record<string, unknown>
+  ) {
+    const levels = ["debug", "info", "notice", "warning", "error", "critical", "alert", "emergency"];
+    const currentLevelIndex = levels.indexOf(this.logLevel);
+    const messageLevelIndex = levels.indexOf(level);
+
+    // Only log if message level is >= current log level
+    if (messageLevelIndex >= currentLevelIndex) {
+      this.server.sendLoggingMessage({
+        level,
+        logger: "gitlab-mcp-server",
+        data: {
+          message,
+          ...data,
+        },
+      });
+    }
   }
 
   async run() {
